@@ -268,7 +268,7 @@ END FUNCTION dichoto_d
 !
 !
 !
-ELEMENTAL FUNCTION phase_r(z)
+FUNCTION phase_r(z)
 !
 ! This function gives the phase of the complex number (between 0 and 2*PI)
 !
@@ -303,7 +303,7 @@ END FUNCTION phase_r
 !
 !
 !
-ELEMENTAL FUNCTION phase_d(z)
+FUNCTION phase_d(z)
 !
 ! This function gives the phase of the complex number (between 0 and 2*PI)
 !

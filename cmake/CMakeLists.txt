@@ -6,7 +6,7 @@ SET(BUILD_SHARED_LIBS ON)
 
 # Define manually these variables to access fftw and lapack libraries
 # FFTW_ROOT
-# LAPACK_ROOT
+SET(LAPACK_ROOT /nopt/nrel/apps/libraries/modules-11-23/netlib-lapack)
 
 ################################################################################
 SET(SRC_DIRECTORY     ${CMAKE_CURRENT_SOURCE_DIR}/../sources)
@@ -36,7 +36,7 @@ IF(CMAKE_BUILD_TYPE_UPPER MATCHES DEBUG)
     SET(BUILD_SHARED_LIBS OFF)
 ENDIF()
 
-IF(${CMAKE_BUILD_TYPE_UPPER} STREQUAL "COVERAGE")
+IF(CMAKE_BUILD_TYPE_UPPER STREQUAL "COVERAGE")
     MESSAGE(STATUS "Adding coverage")
     FIND_PACKAGE(codecov)
 ENDIF()
@@ -90,7 +90,7 @@ TARGET_LINK_LIBRARIES(Post_processing ${FFTW_LIBRARIES})
 ADD_EXECUTABLE(check_W_DYue ${srcCheck_W_DYue})
 TARGET_LINK_LIBRARIES(check_W_DYue lapack blas ${FFTW_LIBRARIES})
 
-IF(${CMAKE_BUILD_TYPE_UPPER} STREQUAL "COVERAGE")
+IF(CMAKE_BUILD_TYPE_UPPER STREQUAL "COVERAGE")
     add_coverage(HOS_ocean)
     # add_coverage(Post_processing)
     # add_coverage(check_W_DYue)
@@ -155,3 +155,11 @@ ENDMACRO()
 ADD_A_NEW_TEST(Convergence_RF)
 
 INCLUDE(CMakePack)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message(STATUS "Building debug version")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  message(STATUS "Building release version")
+else()
+  message(STATUS "Building other version: ${CMAKE_BUILD_TYPE}")
+endif()

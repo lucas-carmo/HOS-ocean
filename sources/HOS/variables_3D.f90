@@ -30,7 +30,7 @@ USE ramp
 IMPLICIT NONE
 !
 ! Number of modes
-INTEGER, PARAMETER :: n1 = 256
+INTEGER, PARAMETER :: n1 = 64
 INTEGER, PARAMETER :: n2 = 64
 ! Array size
 INTEGER, PARAMETER :: m1 = n1
@@ -159,6 +159,21 @@ REAL(RP), DIMENSION(maxprobes) :: xprobe, yprobe, eta_probe
 !
 ! Restart quantities
 REAL(RP) :: time_restart
+!
+! Variables from Jie Yu, NRL. 2018-08-08
+!
+REAL(RP), ALLOCATABLE :: freq_ww(:)
+REAL(RP), ALLOCATABLE :: thet_ww(:)
+REAL(RP), ALLOCATABLE :: phi_ww(:,:)
+REAL(RP), ALLOCATABLE :: phi_ww_int(:),E_int(:), df(:)
+real(rp), ALLOCATABLE :: phi2(:,:)
+real(rp), ALLOCATABLE :: thet2(:)
+integer, ALLOCATABLE :: indx(:)
+REAL(RP) :: ww3shft
+integer (kind=4) :: npt
+integer (kind=4) :: nr
+INTEGER ::  ifreq
+INTEGER ::  ithet
 !
 CONTAINS
 !

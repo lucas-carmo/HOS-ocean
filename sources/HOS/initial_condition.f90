@@ -33,18 +33,17 @@ USE Bivar
 USE input_HOS
 USE linear_wave
 USE random_numbers
+USE SHEPPACK
 !USE IFPORT
 !
 IMPLICIT NONE
 !
 TYPE(RF_data) :: RF_obj
 INTEGER :: n_lambda_x, n_lambda_y
-! FIXME : is it necessary to have these?
-INTEGER, PARAMETER ::  ifreq = 40
-INTEGER, PARAMETER ::  ithet = 36
-REAL(RP), DIMENSION(ifreq) :: freq_ww
-REAL(RP), DIMENSION(ithet) :: thet_ww
-REAL(RP), DIMENSION(ifreq,ithet):: phi_ww
+! ! FIXME : is it necessary to have these?
+! REAL(RP), DIMENSION(ifreq) :: freq_ww
+! REAL(RP), DIMENSION(ithet) :: thet_ww
+! REAL(RP), DIMENSION(ifreq,ithet):: phi_ww
 !
 !
 !
@@ -627,315 +626,315 @@ END SUBROUTINE initiate_irreg
 !
 !
 !
-SUBROUTINE initiate_irreg_f
-!
-!-------------------------------------------
-!
-! Initialisation of irregular multi-directional sea state (linear)
-!   - From spectrum file from WAVEWATCH III
-!   - Bilinear or bicubic interpolation
-!
-!-------------------------------------------
-!
-IMPLICIT NONE
+! SUBROUTINE initiate_irreg_f
+! !
+! !-------------------------------------------
+! !
+! ! Initialisation of irregular multi-directional sea state (linear)
+! !   - From spectrum file from WAVEWATCH III
+! !   - Bilinear or bicubic interpolation
+! !
+! !-------------------------------------------
+! !
+! IMPLICIT NONE
 
-REAL(RP) :: theta, E, pioxlen, pioylen,d1,d2,d3,d4
-REAL(RP) :: angle, angle1, angle2
-REAL(RP), DIMENSION(m1o2p1,m2,2) :: rnd
-REAL(RP), DIMENSION(m1o2p1,m2)   :: phi_E
-REAL(RP), DIMENSION(m1o2p1,m2,4) :: coef_ww2cart
-INTEGER, DIMENSION(m1o2p1,m2) :: ind_o_ww,ind_t_ww
-INTEGER :: iseed,i1,i2,i_int,I_cpt,ndp
-REAL(RP), DIMENSION(ifreq) :: ones_f
-REAL(RP), DIMENSION(ithet) :: ones_t
-INTEGER, DIMENSION(31*ifreq*ithet+1) :: IWK
-REAL(RP), DIMENSION(8*ifreq*ithet) :: WK
-REAL(RP), DIMENSION(ifreq*ithet) :: xd,yd,zd
-REAL(RP), DIMENSION(1) :: xi,yi,zi
-!% I_int = 1 bilinear interpol between WW3 intput and HOS grid
-!% I_int = 2 bivar interpol
-I_int=2
+! REAL(RP) :: theta, E, pioxlen, pioylen,d1,d2,d3,d4
+! REAL(RP) :: angle, angle1, angle2
+! REAL(RP), DIMENSION(m1o2p1,m2,2) :: rnd
+! REAL(RP), DIMENSION(m1o2p1,m2)   :: phi_E
+! REAL(RP), DIMENSION(m1o2p1,m2,4) :: coef_ww2cart
+! INTEGER, DIMENSION(m1o2p1,m2) :: ind_o_ww,ind_t_ww
+! INTEGER :: iseed,i1,i2,i_int,I_cpt,ndp
+! REAL(RP), DIMENSION(ifreq) :: ones_f
+! REAL(RP), DIMENSION(ithet) :: ones_t
+! INTEGER, DIMENSION(31*ifreq*ithet+1) :: IWK
+! REAL(RP), DIMENSION(8*ifreq*ithet) :: WK
+! REAL(RP), DIMENSION(ifreq*ithet) :: xd,yd,zd
+! REAL(RP), DIMENSION(1) :: xi,yi,zi
+! !% I_int = 1 bilinear interpol between WW3 intput and HOS grid
+! !% I_int = 2 bivar interpol
+! I_int=2
 
-pioxlen = TWOPI/xlen_star
-pioylen = TWOPI/ylen_star
+! pioxlen = TWOPI/xlen_star
+! pioylen = TWOPI/ylen_star
 
 
-a_eta(1,1)  = 0.0_rp
-a_phis(1,1) = 0.0_rp
-phi_E = 0.0_rp
-ones_t(:)=1.0
-ones_f(:)=1.0
+! a_eta(1,1)  = 0.0_rp
+! a_phis(1,1) = 0.0_rp
+! phi_E = 0.0_rp
+! ones_t(:)=1.0
+! ones_f(:)=1.0
 
-IF(i_int == 1) THEN
-    WRITE(*,*) '----------Bilinear Interpolation from WW3 Input-----------------'
-    DO i1 = 1, n1o2p1
-        DO i2 = 1, n2
-        IF(omega_n2(i1,i2) .ge. freq_ww(1) .and. omega_n2(i1,i2) .le. freq_ww(ifreq)) THEN
-            ind_o_ww(i1,i2)=MINLOC(abs(freq_ww(:)-omega_n2(i1,i2)*ones_f(:)),1)
-            IF(freq_ww(ind_o_ww(i1,i2)) .gt. omega_n2(i1,i2)) ind_o_ww(i1,i2)=ind_o_ww(i1,i2)-1
-            !WRITE(*,*) 'ind_o_ww(i1,i2)=',ind_o_ww(i1,i2),freq_ww(ind_o_ww(i1,i2)),omega_n2(i1,i2)
-                IF(i1 == 1) THEN
-                    theta = PIO2
-                ELSE
-                    theta = ATAN(ky_n2(i2)/kx(i1))
-                    IF(theta .lt. 0.0_rp) theta = theta + TWOPI
-                ENDIF
-                ind_t_ww(i1,i2)=MINLOC(abs(theta*ones_t-thet_ww),1)
-                IF(thet_ww(ind_t_ww(i1,i2)) .gt. theta .and. ind_t_ww(i1,i2).ne. 1) ind_t_ww(i1,i2)=ind_t_ww(i1,i2)-1
-                !
-                    IF(ind_t_ww(i1,i2) /= ithet)THEN
-                        d1=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2))))**2 &
-                              +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
-                        d2=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2))))**2 &
-                              +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
-                        d3=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2)+1)))**2 &
-                              +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2)+1)))**2)
-                        d4=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2)+1)))**2 &
-                              +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2)+1)))**2)
-                        !
-                        coef_ww2cart(i1,i2,1)=d2*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                        coef_ww2cart(i1,i2,2)=d1*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                        coef_ww2cart(i1,i2,3)=d1*d2*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                        coef_ww2cart(i1,i2,4)=d1*d2*d3/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                        !
-                        phi_E(i1,i2)= coef_ww2cart(i1,i2,1) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2))   + &
-                                  coef_ww2cart(i1,i2,2) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)) + &
-                                  coef_ww2cart(i1,i2,3) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)+1) + &
-                                  coef_ww2cart(i1,i2,4) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)+1)
-                        !IF(i2==1) WRITE(*,*) 'phi_E(i1,i2)=',phi_E(i1,i2),phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)),phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)+1)
-                ELSE
-                    d1 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2))))**2+ &
-                              (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
-                    d2 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2))))**2+ &
-                              (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
-                    d3 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(1)))**2+ &
-                              (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(1)))**2)
-                    d4 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(1)))**2+ &
-                              (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(1)))**2)
-                    !
-                    coef_ww2cart(i1,i2,1)=d2*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                    coef_ww2cart(i1,i2,2)=d1*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                    coef_ww2cart(i1,i2,3)=d1*d2*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                    coef_ww2cart(i1,i2,4)=d1*d2*d3/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
-                    !
-                    !
-                    phi_E(i1,i2)= coef_ww2cart(i1,i2,1) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)) + &
-                                  coef_ww2cart(i1,i2,2) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)) + &
-                                  coef_ww2cart(i1,i2,3) * phi_ww(ind_o_ww(i1,i2),1) + &
-                                  coef_ww2cart(i1,i2,4) * phi_ww(ind_o_ww(i1,i2)+1,1)
-                ENDIF
-            ELSE
-                phi_E(i1,i2)=0.0_rp
-            ENDIF
-        ENDDO
-    ENDDO
-ELSEIF(i_int == 2) THEN
-    WRITE(*,*) '-----------Bicubic Interpolation from WW3 Input---------'
-    I_cpt=1
-    NDP=ithet*ifreq
-    xd=0.0
-    yd=0.0
-    zd=0.0
-    DO i1=1,ifreq
-        DO i2=1,ithet
-                xd((i1-1)*ithet + i2) = freq_ww(i1)**2*cos(thet_ww(i2))
-                yd((i1-1)*ithet + i2) = freq_ww(i1)**2*sin(thet_ww(i2))
-                zd((i1-1)*ithet + i2) = phi_ww(i1,i2)
-        ENDDO
-    ENDDO
-    DO i1 = 1, n1o2p1
-        DO i2 = 1, n2
-            IF(omega_n2(i1,i2) .ge. freq_ww(1) .and. omega_n2(i1,i2) .le. freq_ww(ifreq)) THEN
-                xi=k_abs(i1,i2)*cos(theta_abs(i1,i2))
-                yi=k_abs(i1,i2)*sin(theta_abs(i1,i2))
-                CALL IDBVIP(I_cpt,ndp,REAL(xd),REAL(yd),REAL(zd),1,REAL(xi),REAL(yi),REAL(zi),IWK,REAL(WK))
-                phi_E(i1,i2) = zi(1)
-                I_cpt = 2
-            ENDIF
-        ENDDO
-    ENDDO
-    IF(ISEVEN(n2)) phi_E(:,n2o2p1) = 0.0_rp
-ENDIF
+! IF(i_int == 1) THEN
+!     WRITE(*,*) '----------Bilinear Interpolation from WW3 Input-----------------'
+!     DO i1 = 1, n1o2p1
+!         DO i2 = 1, n2
+!         IF(omega_n2(i1,i2) .ge. freq_ww(1) .and. omega_n2(i1,i2) .le. freq_ww(ifreq)) THEN
+!             ind_o_ww(i1,i2)=MINLOC(abs(freq_ww(:)-omega_n2(i1,i2)*ones_f(:)),1)
+!             IF(freq_ww(ind_o_ww(i1,i2)) .gt. omega_n2(i1,i2)) ind_o_ww(i1,i2)=ind_o_ww(i1,i2)-1
+!             !WRITE(*,*) 'ind_o_ww(i1,i2)=',ind_o_ww(i1,i2),freq_ww(ind_o_ww(i1,i2)),omega_n2(i1,i2)
+!                 IF(i1 == 1) THEN
+!                     theta = PIO2
+!                 ELSE
+!                     theta = ATAN(ky_n2(i2)/kx(i1))
+!                     IF(theta .lt. 0.0_rp) theta = theta + TWOPI
+!                 ENDIF
+!                 ind_t_ww(i1,i2)=MINLOC(abs(theta*ones_t-thet_ww),1)
+!                 IF(thet_ww(ind_t_ww(i1,i2)) .gt. theta .and. ind_t_ww(i1,i2).ne. 1) ind_t_ww(i1,i2)=ind_t_ww(i1,i2)-1
+!                 !
+!                     IF(ind_t_ww(i1,i2) /= ithet)THEN
+!                         d1=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2))))**2 &
+!                               +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
+!                         d2=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2))))**2 &
+!                               +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
+!                         d3=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2)+1)))**2 &
+!                               +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2)+1)))**2)
+!                         d4=SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2)+1)))**2 &
+!                               +(omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2)+1)))**2)
+!                         !
+!                         coef_ww2cart(i1,i2,1)=d2*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                         coef_ww2cart(i1,i2,2)=d1*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                         coef_ww2cart(i1,i2,3)=d1*d2*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                         coef_ww2cart(i1,i2,4)=d1*d2*d3/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                         !
+!                         phi_E(i1,i2)= coef_ww2cart(i1,i2,1) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2))   + &
+!                                   coef_ww2cart(i1,i2,2) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)) + &
+!                                   coef_ww2cart(i1,i2,3) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)+1) + &
+!                                   coef_ww2cart(i1,i2,4) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)+1)
+!                         !IF(i2==1) WRITE(*,*) 'phi_E(i1,i2)=',phi_E(i1,i2),phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)),phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)+1)
+!                 ELSE
+!                     d1 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(ind_t_ww(i1,i2))))**2+ &
+!                               (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
+!                     d2 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(ind_t_ww(i1,i2))))**2+ &
+!                               (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(ind_t_ww(i1,i2))))**2)
+!                     d3 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2))**2*cos(thet_ww(1)))**2+ &
+!                               (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2))**2*sin(thet_ww(1)))**2)
+!                     d4 = SQRT((omega_n2(i1,i2)**2*cos(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*cos(thet_ww(1)))**2+ &
+!                               (omega_n2(i1,i2)**2*sin(theta)-freq_ww(ind_o_ww(i1,i2)+1)**2*sin(thet_ww(1)))**2)
+!                     !
+!                     coef_ww2cart(i1,i2,1)=d2*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                     coef_ww2cart(i1,i2,2)=d1*d3*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                     coef_ww2cart(i1,i2,3)=d1*d2*d4/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                     coef_ww2cart(i1,i2,4)=d1*d2*d3/(d2*d3*d4+d1*d3*d4+d1*d2*d4+d1*d2*d3)
+!                     !
+!                     !
+!                     phi_E(i1,i2)= coef_ww2cart(i1,i2,1) * phi_ww(ind_o_ww(i1,i2),ind_t_ww(i1,i2)) + &
+!                                   coef_ww2cart(i1,i2,2) * phi_ww(ind_o_ww(i1,i2)+1,ind_t_ww(i1,i2)) + &
+!                                   coef_ww2cart(i1,i2,3) * phi_ww(ind_o_ww(i1,i2),1) + &
+!                                   coef_ww2cart(i1,i2,4) * phi_ww(ind_o_ww(i1,i2)+1,1)
+!                 ENDIF
+!             ELSE
+!                 phi_E(i1,i2)=0.0_rp
+!             ENDIF
+!         ENDDO
+!     ENDDO
+! ELSEIF(i_int == 2) THEN
+!     WRITE(*,*) '-----------Bicubic Interpolation from WW3 Input---------'
+!     I_cpt=1
+!     NDP=ithet*ifreq
+!     xd=0.0
+!     yd=0.0
+!     zd=0.0
+!     DO i1=1,ifreq
+!         DO i2=1,ithet
+!                 xd((i1-1)*ithet + i2) = freq_ww(i1)**2*cos(thet_ww(i2))
+!                 yd((i1-1)*ithet + i2) = freq_ww(i1)**2*sin(thet_ww(i2))
+!                 zd((i1-1)*ithet + i2) = phi_ww(i1,i2)
+!         ENDDO
+!     ENDDO
+!     DO i1 = 1, n1o2p1
+!         DO i2 = 1, n2
+!             IF(omega_n2(i1,i2) .ge. freq_ww(1) .and. omega_n2(i1,i2) .le. freq_ww(ifreq)) THEN
+!                 xi=k_abs(i1,i2)*cos(theta_abs(i1,i2))
+!                 yi=k_abs(i1,i2)*sin(theta_abs(i1,i2))
+!                 CALL IDBVIP(I_cpt,ndp,REAL(xd),REAL(yd),REAL(zd),1,REAL(xi),REAL(yi),REAL(zi),IWK,REAL(WK))
+!                 phi_E(i1,i2) = zi(1)
+!                 I_cpt = 2
+!             ENDIF
+!         ENDDO
+!     ENDDO
+!     IF(ISEVEN(n2)) phi_E(:,n2o2p1) = 0.0_rp
+! ENDIF
+! !
+! ! Compute the random numbers used for phases
+! IF (random_phases.EQ.0) THEN ! Random numbers are the same at every run for a given value of n1 and n2
+!     CALL init_not_random_seed()
+!     CALL RANDOM_NUMBER(rnd)
+! ELSEIF (random_phases.EQ.1) THEN ! Random numbers are different at every run
+!     CALL init_random_seed()
+!     CALL RANDOM_NUMBER(rnd)
+! ELSE
+!     PRINT*, 'Random number generation undefined'
+!     STOP
+! ENDIF
+! !
+! a_eta=0.0_cp
+! a_phis=0.0_cp
+! E=0.0_rp
+! DO i1 = 1, n1o2p1
+!     DO i2 = 1, n2
+!         IF(ABS(phi_E(i1,i2)).gt.tiny)THEN
+!             IF(i1 /= 1 .or. i2 /= 1)THEN
+!                 angle1 = rnd(i1,i2,1)*TWOPI
+!                 angle2 = rnd(i1,i2,2)*TWOPI
+!                 !
+!                 angle = 0.0_rp
+!                 a_eta(i1,i2)  = (phi_E(i1,i2)/abs(phi_E(i1,i2)))* (1.0_rp/omega_n2(i1,i2)**3 &
+!                             *abs(phi_E(i1,i2))*pioxlen*pioylen)**(0.5_rp)*exp(i*(angle1+angle2+angle))
+!                 a_phis(i1,i2) = (phi_E(i1,i2)/abs(phi_E(i1,i2)))* (-1.0_rp*i/omega_n2(i1,i2)) *(1.0_rp/omega_n2(i1,i2)**3 &
+!                           *abs(phi_E(i1,i2))*pioxlen*pioylen)**(0.5_rp)*exp(i*(angle1+angle2+angle))
+!                 E = E + 1.0_rp/(2.0_rp*omega_n2(i1,i2)**3)*phi_E(i1,i2)*pioxlen*pioylen
+!             ENDIF
+!         ENDIF
+!     ENDDO
+! ENDDO
+! !
+! E_tot = E * g_star
+! WRITE(*,*) 'E_tot_ini =',E * L_out**3 / T_out**2 ,'Hs_ini =',4*SQRT(E/g_star) * L_out, 'Tp_ini =',Tp_real
+! !
+! END SUBROUTINE initiate_irreg_f
 !
-! Compute the random numbers used for phases
-IF (random_phases.EQ.0) THEN ! Random numbers are the same at every run for a given value of n1 and n2
-    CALL init_not_random_seed()
-    CALL RANDOM_NUMBER(rnd)
-ELSEIF (random_phases.EQ.1) THEN ! Random numbers are different at every run
-    CALL init_random_seed()
-    CALL RANDOM_NUMBER(rnd)
-ELSE
-    PRINT*, 'Random number generation undefined'
-    STOP
-ENDIF
-!
-a_eta=0.0_cp
-a_phis=0.0_cp
-E=0.0_rp
-DO i1 = 1, n1o2p1
-    DO i2 = 1, n2
-        IF(ABS(phi_E(i1,i2)).gt.tiny)THEN
-            IF(i1 /= 1 .or. i2 /= 1)THEN
-                angle1 = rnd(i1,i2,1)*TWOPI
-                angle2 = rnd(i1,i2,2)*TWOPI
-                !
-                angle = 0.0_rp
-                a_eta(i1,i2)  = (phi_E(i1,i2)/abs(phi_E(i1,i2)))* (1.0_rp/omega_n2(i1,i2)**3 &
-                            *abs(phi_E(i1,i2))*pioxlen*pioylen)**(0.5_rp)*exp(i*(angle1+angle2+angle))
-                a_phis(i1,i2) = (phi_E(i1,i2)/abs(phi_E(i1,i2)))* (-1.0_rp*i/omega_n2(i1,i2)) *(1.0_rp/omega_n2(i1,i2)**3 &
-                          *abs(phi_E(i1,i2))*pioxlen*pioylen)**(0.5_rp)*exp(i*(angle1+angle2+angle))
-                E = E + 1.0_rp/(2.0_rp*omega_n2(i1,i2)**3)*phi_E(i1,i2)*pioxlen*pioylen
-            ENDIF
-        ENDIF
-    ENDDO
-ENDDO
-!
-E_tot = E * g_star
-WRITE(*,*) 'E_tot_ini =',E * L_out**3 / T_out**2 ,'Hs_ini =',4*SQRT(E/g_star) * L_out, 'Tp_ini =',Tp_real
-!
-END SUBROUTINE initiate_irreg_f
 !
 !
-!
-SUBROUTINE read_irreg_f
-!
-!----------------------------------------------------------------------
-!
-! Reading of the spectrum given in a WAVEWATCH III simulation
-! FIXME : describe the SUBROUTINE
-! FIXME : do we keep it? Useful? Bring back global variables here?
-!
-!----------------------------------------------------------------------
-!
-IMPLICIT NONE
-!
-REAL(RP) ::dthet,O_p_ww,k_p_ww,E_int_tot
-INTEGER :: i1,i2,ii,jj,ind_o_max
-REAL(RP), DIMENSION(ifreq) :: phi_ww_int,S_in_int,S_diss_int,E_int,S_nl_int
-REAL(RP), DIMENSION(ifreq,ithet) :: S_diss_ww, S_in_ww,S_nl_ww
-REAL(RP),DIMENSION(7) :: phi_temp
-!
-! FIXME : name of file in input file?
-OPEN(1002,file='/home/perignon/PHD/WW3/ww3.1m5s_nl.src')
-!
-READ(1002,*)
-DO ii=1,FLOOR(ifreq/8.0)
-    READ(1002,*) freq_ww(8*(ii-1)+1:8*ii)
-ENDDO
-DO ii=1,FLOOR(ithet/7.0)
-  READ(1002,*) thet_ww(7*(ii-1)+1:7*ii)
-ENDDO
-READ(1002,*) thet_ww(7*(ii-1)+1:ithet)
-dthet=abs(thet_ww(2)-thet_ww(1))
-!
-READ(1002,*)
-READ(1002,*)
-DO i1=1,FLOOR(ithet * ifreq / 7.0)
-    READ(1002,*) phi_temp(1:7)
-    DO i2 = 1,7
-        jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
-        ii=(i1-1)*7+i2 - (jj-1)*ifreq
-        phi_ww(ii,jj)=phi_temp(i2)
-    ENDDO
-ENDDO
-!
-READ(1002,*) phi_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
+! SUBROUTINE read_irreg_f
+! !
+! !----------------------------------------------------------------------
+! !
+! ! Reading of the spectrum given in a WAVEWATCH III simulation
+! ! FIXME : describe the SUBROUTINE
+! ! FIXME : do we keep it? Useful? Bring back global variables here?
+! !
+! !----------------------------------------------------------------------
+! !
+! IMPLICIT NONE
+! !
+! REAL(RP) ::dthet,O_p_ww,k_p_ww,E_int_tot
+! INTEGER :: i1,i2,ii,jj,ind_o_max
+! REAL(RP), DIMENSION(ifreq) :: phi_ww_int,S_in_int,S_diss_int,E_int,S_nl_int
+! REAL(RP), DIMENSION(ifreq,ithet) :: S_diss_ww, S_in_ww,S_nl_ww
+! REAL(RP),DIMENSION(7) :: phi_temp
+! !
+! ! FIXME : name of file in input file?
+! OPEN(1002,file='/home/perignon/PHD/WW3/ww3.1m5s_nl.src')
+! !
+! READ(1002,*)
+! DO ii=1,FLOOR(ifreq/8.0)
+!     READ(1002,*) freq_ww(8*(ii-1)+1:8*ii)
+! ENDDO
+! DO ii=1,FLOOR(ithet/7.0)
+!   READ(1002,*) thet_ww(7*(ii-1)+1:7*ii)
+! ENDDO
+! READ(1002,*) thet_ww(7*(ii-1)+1:ithet)
+! dthet=abs(thet_ww(2)-thet_ww(1))
+! !
+! READ(1002,*)
+! READ(1002,*)
+! DO i1=1,FLOOR(ithet * ifreq / 7.0)
+!     READ(1002,*) phi_temp(1:7)
+!     DO i2 = 1,7
+!         jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
+!         ii=(i1-1)*7+i2 - (jj-1)*ifreq
+!         phi_ww(ii,jj)=phi_temp(i2)
+!     ENDDO
+! ENDDO
+! !
+! READ(1002,*) phi_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
 
-DO i1=1,FLOOR(ithet * ifreq / 7.0)
-    READ(1002,*) phi_temp(1:7)
-    DO i2 = 1,7
-        jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
-        ii=(i1-1)*7+i2 - (jj-1)*ifreq
-        S_in_ww(ii,jj)=phi_temp(i2)
-    ENDDO
-ENDDO
-READ(1002,*) S_in_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
-!
-DO i1=1,FLOOR(ithet * ifreq / 7.0)
-    READ(1002,*) phi_temp(1:7)
-    DO i2 = 1,7
-        jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
-        ii=(i1-1)*7+i2 - (jj-1)*ifreq
-        S_nl_ww(ii,jj)=phi_temp(i2)
-    ENDDO
-ENDDO
-READ(1002,*) S_nl_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
-!
-DO i1=1,FLOOR(ithet * ifreq / 7.0)
-    READ(1002,*) phi_temp(1:7)
-    DO i2 = 1,7
-        jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
-        ii=(i1-1)*7+i2 - (jj-1)*ifreq
-        S_diss_ww(ii,jj)=phi_temp(i2)
-    ENDDO
-ENDDO
-READ(1002,*) S_diss_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
-CLOSE(1002)
-!
-S_in_int = 0.0_rp
-S_diss_int = 0.0_rp
-E_int = 0.0_rp
-S_nl_int = 0.0_rp
-E_int_tot = 0.0_rp
-DO jj=1,ithet
-    DO ii = 1,ifreq
-        S_in_int(ii) = S_in_int(ii) + S_in_ww(ii,jj) * dthet
-        S_diss_int(ii) = S_diss_int(ii) + S_diss_ww(ii,jj) * dthet
-        E_int(ii) = E_int(ii) + phi_ww(ii,jj) * dthet
-        S_nl_int(ii) = S_nl_int(ii) + S_nl_ww(ii,jj) * dthet
-    ENDDO
-ENDDO
-DO ii = 1,ifreq-1
-    E_int_tot = E_int_tot + 0.5_rp*(E_int(ii)+E_int(ii+1))*(freq_ww(ii+1)-freq_ww(ii))
-ENDDO
-!
-133 FORMAT(4(ES15.8,X),ES15.8)
-103 FORMAT(A,F9.2,A,I5,A,I5)
-!
-! Transform frequency -> omega & theta grid to same ref. as HOS
-phi_ww=phi_ww / TWOPI
-thet_ww=PIO2-thet_ww
-DO i1=1,ithet
-    IF(thet_ww(i1) .lt. 0.0_rp) thet_ww(i1) = thet_ww(i1) + TWOPI
-ENDDO
-freq_ww=freq_ww * TWOPI
-!
-! ************
-! Adim the variables
-! ************
-DO ii=1,ifreq
-    phi_ww_int(ii)=SUM(phi_ww(ii,:)) * dthet
-ENDDO
-!
-ind_o_max=MAXLOC(phi_ww_int,1)
-O_p_ww=freq_ww(ind_o_max)
-k_p_ww = O_p_ww**2 / grav ! FIXME: check if it is working if grav.ne.9.81
-Tp_real = TWOPI / O_p_ww
-L_out=1/k_p_ww **2
-T_out=1/O_p_ww
-Hs_real = 4.0_rp * sqrt(E_int_tot)
-!%%%%%%%%%%%%%%%
-OPEN(130,file='./S_BAJ_int.dat',status='unknown')
-CALL write_input(130)
-WRITE(130,'(A)')'TITLE=" 1D WW3 Source Term"'
-WRITE(130,'(A)') 'VARIABLES="fx","E_int","S_in_ww3_int","S_diss_int","S_nl_int"'
+! DO i1=1,FLOOR(ithet * ifreq / 7.0)
+!     READ(1002,*) phi_temp(1:7)
+!     DO i2 = 1,7
+!         jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
+!         ii=(i1-1)*7+i2 - (jj-1)*ifreq
+!         S_in_ww(ii,jj)=phi_temp(i2)
+!     ENDDO
+! ENDDO
+! READ(1002,*) S_in_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
+! !
+! DO i1=1,FLOOR(ithet * ifreq / 7.0)
+!     READ(1002,*) phi_temp(1:7)
+!     DO i2 = 1,7
+!         jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
+!         ii=(i1-1)*7+i2 - (jj-1)*ifreq
+!         S_nl_ww(ii,jj)=phi_temp(i2)
+!     ENDDO
+! ENDDO
+! READ(1002,*) S_nl_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
+! !
+! DO i1=1,FLOOR(ithet * ifreq / 7.0)
+!     READ(1002,*) phi_temp(1:7)
+!     DO i2 = 1,7
+!         jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
+!         ii=(i1-1)*7+i2 - (jj-1)*ifreq
+!         S_diss_ww(ii,jj)=phi_temp(i2)
+!     ENDDO
+! ENDDO
+! READ(1002,*) S_diss_ww(ifreq-(ithet *ifreq-7*FLOOR(ithet * ifreq / 7.0))+1:ifreq,ithet)
+! CLOSE(1002)
+! !
+! S_in_int = 0.0_rp
+! S_diss_int = 0.0_rp
+! E_int = 0.0_rp
+! S_nl_int = 0.0_rp
+! E_int_tot = 0.0_rp
+! DO jj=1,ithet
+!     DO ii = 1,ifreq
+!         S_in_int(ii) = S_in_int(ii) + S_in_ww(ii,jj) * dthet
+!         S_diss_int(ii) = S_diss_int(ii) + S_diss_ww(ii,jj) * dthet
+!         E_int(ii) = E_int(ii) + phi_ww(ii,jj) * dthet
+!         S_nl_int(ii) = S_nl_int(ii) + S_nl_ww(ii,jj) * dthet
+!     ENDDO
+! ENDDO
+! DO ii = 1,ifreq-1
+!     E_int_tot = E_int_tot + 0.5_rp*(E_int(ii)+E_int(ii+1))*(freq_ww(ii+1)-freq_ww(ii))
+! ENDDO
+! !
+! 133 FORMAT(4(ES15.8,X),ES15.8)
+! 103 FORMAT(A,F9.2,A,I5,A,I5)
+! !
+! ! Transform frequency -> omega & theta grid to same ref. as HOS
+! phi_ww=phi_ww / TWOPI
+! thet_ww=PIO2-thet_ww
+! DO i1=1,ithet
+!     IF(thet_ww(i1) .lt. 0.0_rp) thet_ww(i1) = thet_ww(i1) + TWOPI
+! ENDDO
+! freq_ww=freq_ww * TWOPI
+! !
+! ! ************
+! ! Adim the variables
+! ! ************
+! DO ii=1,ifreq
+!     phi_ww_int(ii)=SUM(phi_ww(ii,:)) * dthet
+! ENDDO
+! !
+! ind_o_max=MAXLOC(phi_ww_int,1)
+! O_p_ww=freq_ww(ind_o_max)
+! k_p_ww = O_p_ww**2 / grav ! FIXME: check if it is working if grav.ne.9.81
+! Tp_real = TWOPI / O_p_ww
+! L_out=1/k_p_ww **2
+! T_out=1/O_p_ww
+! Hs_real = 4.0_rp * sqrt(E_int_tot)
+! !%%%%%%%%%%%%%%%
+! OPEN(130,file='./S_BAJ_int.dat',status='unknown')
+! CALL write_input(130)
+! WRITE(130,'(A)')'TITLE=" 1D WW3 Source Term"'
+! WRITE(130,'(A)') 'VARIABLES="fx","E_int","S_in_ww3_int","S_diss_int","S_nl_int"'
 
-IF (tecplot == 11) THEN
-    WRITE(130,103)'ZONE SOLUTIONTIME = ',0.0_rp,', I=',ifreq
-ELSE
-    WRITE(130,103)'ZONE T = "',0.0_rp,'", I=',ifreq
-ENDIF
-!
-DO ii = 1, ifreq
-    WRITE(130,133) freq_ww(ii)/ TWOPI,E_int(ii),S_in_int(ii),-S_diss_int(ii),S_nl_int(ii)
-ENDDO
-CLOSE(130)
-!%%%%%%%%%%%%%%%
-freq_ww =freq_ww / SQRT(grav*k_p_ww) ! FIXME: check if it is working if grav.ne.9.81
-phi_ww = phi_ww * k_p_ww **2 * O_p_ww
-!
-!
-END SUBROUTINE read_irreg_f
+! IF (tecplot == 11) THEN
+!     WRITE(130,103)'ZONE SOLUTIONTIME = ',0.0_rp,', I=',ifreq
+! ELSE
+!     WRITE(130,103)'ZONE T = "',0.0_rp,'", I=',ifreq
+! ENDIF
+! !
+! DO ii = 1, ifreq
+!     WRITE(130,133) freq_ww(ii)/ TWOPI,E_int(ii),S_in_int(ii),-S_diss_int(ii),S_nl_int(ii)
+! ENDDO
+! CLOSE(130)
+! !%%%%%%%%%%%%%%%
+! freq_ww =freq_ww / SQRT(grav*k_p_ww) ! FIXME: check if it is working if grav.ne.9.81
+! phi_ww = phi_ww * k_p_ww **2 * O_p_ww
+! !
+! !
+! END SUBROUTINE read_irreg_f
 !
 !
 !
@@ -1163,4 +1162,397 @@ CALL space_2_fourier(phis,a_phis)
 !
 END SUBROUTINE initiate_NL
 !
+
+
+SUBROUTINE read_irreg_f 
+    !----------------------------------------------------------------------
+    ! Rewritten by Jie Yu, NRL. 2018-08-08
+    ! - Read in the spectrum given by a WAVEWATCH III simulation
+    ! - Recenter the spectrum along the direction-axis, so that the main peaks
+    ! are within the HOS angle range [-pi/2, pi/2]
+    ! - Calculate Tp_real and Hs_real
+    ! - In this version, deep-water waves are assumed.
+    !
+    ! Note: If the input spectrum is already properly situated in [-pi/2,pi/2], skip
+    ! the steps of shifting and relocation.
+    !----------------------------------------------------------------------
+    IMPLICIT NONE
+    REAL(RP) :: dthet, O_p_ww, k_p_ww, E_int_tot, variance
+    INTEGER :: i1,i2,ii,jj,ind_o_max
+    !real(rp) :: Tp_real, L_out, T_out, HS_real
+    !REAL(RP), DIMENSION(ifreq) :: phi_ww_int,E_int,df
+    !REAL(RP), DIMENSION(7) :: phi_temp
+    !real(rp), dimension(ifreq,ithet) :: phi2
+    !real(rp), dimension(ithet) :: thet2
+    !integer, dimension(ithet) :: indx
+    !integer, dimension(2) :: temp
+
+    !** Move the commented declarations to variables_3d.f90
+    !REAL(RP), ALLOCATABLE :: freq_ww(:)
+    !REAL(RP), ALLOCATABLE :: thet_ww(:)
+    !REAL(RP), ALLOCATABLE :: phi_ww(:,:)
+    !REAL(RP), ALLOCATABLE :: phi_ww_int,E_int,df
+    REAL(RP), DIMENSION(7) :: phi_temp
+    !real(rp), ALLOCATABLE :: phi2(:,:)
+    !real(rp), ALLOCATABLE :: thet2(:)
+    !integer, ALLOCATABLE :: indx(:)
+    integer, dimension(2) :: temp
+    integer nloc
+    character*31 str1,str2
+    
+    integer :: ind
+    real(rp) :: shft,tmp1,tmp2
+    ! shft is for relocating the spectral energy. Optimal value may be
+    ! determined by visual inspection of the WW3 data (e.g., using matlab).
+    ! User specifies it as input ww3shft in input_HOS.dat file.
+    shft = ww3shft*PI/180.0_rp  ! Shift value specified by user (convert to radians)
+
+    ! Read WW3 spectrum data file
+    open (1002,file='WW3_spec_in.txt',status='old')
+    PRINT *, 'Reading WW3 spectrum data file...'
+    read(1002,*) str1,ifreq,ithet,nloc,str2
+    npt = ifreq*ithet
+    nr = floor(dsqrt(npt/3.0_rp))
+    allocate(freq_ww(ifreq),thet_ww(ithet),phi_ww(ifreq,ithet))
+    allocate(phi_ww_int(ifreq),E_int(ifreq),df(ifreq))
+    allocate(phi2(ifreq,ithet))
+    allocate(thet2(ithet),indx(ithet))
+
+    DO ii=1,FLOOR(ifreq/8.0)
+        READ(1002,*) freq_ww(8*(ii-1)+1:8*ii)
+    ENDDO
+    if (8*FLOOR(ifreq/8.0).lt.ifreq) then
+        ii=8*floor(ifreq/8.0)+1
+        read(1002,*) freq_ww(ii:ifreq)
+    endif
+
+    DO ii=1,FLOOR(ithet/7.0)
+        READ(1002,*) thet_ww(7*(ii-1)+1:7*ii)
+    ENDDO
+    if (7*FLOOR(ithet/7.0).lt.ithet) then
+        ii=7*floor(ithet/7.0)+1
+        read(1002,*) thet_ww(ii:ithet)
+    endif
+
+    dthet=abs(thet_ww(2)-thet_ww(1))
+    !df as define in plot_ww3_2dspec.m
+    df(1)=freq_ww(2)-freq_ww(1); df(ifreq)=freq_ww(ifreq)-freq_ww(ifreq-1);
+    do ii=2,ifreq-1
+        df(ii)=(freq_ww(ii+1)-freq_ww(ii-1))/2.0_rp;
+    enddo
+
+    READ(1002,*)
+    READ(1002,*)
+    DO i1=1,FLOOR(ithet * ifreq / 7.0)
+        READ(1002,*) phi_temp(1:7)
+        DO i2 = 1,7
+            jj=FLOOR(((i1-1)*7+i2-1)/REAL(ifreq,RP))+1
+            ii=(i1-1)*7+i2 - (jj-1)*ifreq
+            phi_ww(ii,jj)=phi_temp(i2)  !phi_ww(freq,dir)
+        ENDDO
+    ENDDO
+    READ(1002,*) phi_ww(ifreq-(ithet*ifreq-7*FLOOR(ithet*ifreq/7.0))+1:ifreq,ithet)
+    CLOSE(1002)
+
+    ! Preliminary calculations
+    temp=MAXLOC(phi_ww)
+    write(*,*) 'In read_irreg_f, T_p =',1.0/freq_ww(temp(1)), &
+        ' peak dir =',360.0/TWOPI*thet_ww(temp(2))
+    E_int = 0.0_rp
+    E_int_tot = 0.0_rp
+    variance = 0.0_rp
+    DO jj=1,ithet
+        DO ii = 1,ifreq
+            E_int(ii) = E_int(ii) + phi_ww(ii,jj) * dthet
+            variance = variance + phi_ww(ii,jj) * dthet * df(ii)
+        ENDDO
+    ENDDO
+    DO ii = 1,ifreq-1
+        E_int_tot = E_int_tot + &
+            0.5_rp*(E_int(ii)+E_int(ii+1))*(freq_ww(ii+1)-freq_ww(ii))
+    ENDDO
+    write(*,*) 'In read_irreg_f, 4sqrt(variance) =',4.0_rp*sqrt(variance)
+    write(*,*) 'In read_irreg_f, 4sqrt(E_int_tot) =',4.0_rp*sqrt(E_int_tot)
+
+    ! Transform frequency to omega, and S(f,dir) to S(omega,dir)
+    freq_ww=freq_ww * TWOPI  !omega=2*pi*freq
+    phi_ww=phi_ww / TWOPI  !S(omega)=S(f)/2pi
+
+    ! ************
+    ! Adim the variables (preliminary)
+    ! ************
+    DO ii=1,ifreq
+        phi_ww_int(ii)=SUM(phi_ww(ii,:)) * dthet
+    ENDDO
+
+    ! Locate the peak freq
+    ind_o_max= MAXLOC(phi_ww_int,1)
+    O_p_ww = freq_ww(ind_o_max)
+    k_p_ww = O_p_ww**2 / grav  !assuming deep-water waves
+    Tp_real = TWOPI / O_p_ww
+    L_out = 1/k_p_ww
+    T_out = 1/O_p_ww
+    Hs_real = 4.0_rp * sqrt(E_int_tot)
+    tmp1 = sqrt(grav*k_p_ww)
+    tmp2 = k_p_ww **2 * O_p_ww
+    write(*,*) 'From WW3 file, Hs_real,Tp_real =', Hs_real, Tp_real
+    write(*,*) 'From WW3 file, o_p_ww, sqrt(grav*k_p_ww),k_p_ww^2*o_p_ww =',&
+        O_p_ww, tmp1, tmp2
+
+    !In the original WW3 file, the wave directions are not ordered ('messed up')
+    !Sort phi_ww in ascending angle
+    open(77,file='ww3_unsort_dimlss.dat',status='unknown')
+    open(78,file='ww3_sort_dimlss.dat',status='unknown')
+    open(79,file='ww3_sort_dim.dat',status='unknown')
+    open(80,file='ww3_rctr_dimlss.dat',status='unknown')
+    ind=minloc(thet_ww,1)
+    thet2(1)=thet_ww(ind)
+    indx(1) = ind
+    do ii=2,ithet
+        ind=minloc(thet_ww,1,mask=thet_ww.gt.thet2(ii-1))
+        thet2(ii)=thet_ww(ind)
+        indx(ii) =ind
+    enddo
+    do ii=1,ifreq
+        do jj=1,ithet
+            phi2(ii,jj) = phi_ww(ii,indx(jj))
+        enddo
+    enddo
+    do ii=1,ifreq
+        do jj=1,ithet
+            write(77,*) freq_ww(ii)/tmp1, thet_ww(jj), phi_ww(ii,jj)*tmp2
+            write(78,*) freq_ww(ii)/tmp1, thet2(jj), phi2(ii,jj)*tmp2
+            write(79,*) freq_ww(ii), thet2(jj), phi2(ii,jj)
+        enddo
+    enddo
+    close(77)
+    close(78)
+    close(79)
+    phi_ww=phi2
+    thet_ww=thet2
+    temp=maxloc(phi_ww)
+    !Sorting should not change the peak freq and dir
+    write(*,*) 'After sorting, T_p =',TWOPI/freq_ww(temp(1)), &
+        ' peak dir =',360.0/TWOPI*thet_ww(temp(2))
+
+    ! Relocate the peaks
+    do ii=1,ithet
+        thet_ww(ii) = thet_ww(ii)+shft
+        if(thet_ww(ii) .ge. TWOPI) thet_ww(ii) = thet_ww(ii)-TWOPI
+    enddo
+    ind=minloc(thet_ww,1)
+    thet2(1)=thet_ww(ind)
+    indx(1) = ind
+    do ii=2,ithet
+        ind=minloc(thet_ww,1,mask=thet_ww.gt.thet2(ii-1))
+        thet2(ii)=thet_ww(ind)
+        indx(ii) =ind
+    enddo
+    do ii=1,ifreq
+        do jj=1,ithet
+            phi2(ii,jj) = phi_ww(ii,indx(jj))
+        enddo
+    enddo
+    phi_ww=phi2
+    thet_ww=thet2
+    temp=maxloc(phi_ww)
+    !Tp_real should not be changed
+    write(*,*) 'After recentering, T_p =',TWOPI/freq_ww(temp(1)), &
+        ' peak dir =',360.0/TWOPI*thet_ww(temp(2))
+
+    ! Admin variables (after sorting and relocation)
+    !Check the peaks and total energy
+    do ii=1,ifreq
+        phi_ww_int(ii)=SUM(phi_ww(ii,:)) * dthet
+    enddo
+    !Locate the peak freq
+    ind_o_max= MAXLOC(phi_ww_int,1)
+    O_p_ww = freq_ww(ind_o_max)
+    k_p_ww = O_p_ww**2 / grav  !deep water
+    Tp_real = TWOPI / O_p_ww
+    L_out = 1/k_p_ww
+    T_out = 1/O_p_ww
+    Hs_real = 4.0_rp * sqrt(E_int_tot)
+    tmp1 = sqrt(grav*k_p_ww)
+    tmp2 = k_p_ww **2 * O_p_ww
+    write(*,*) 'After relocation, Hs_real,Tp_real =', Hs_real, Tp_real
+    do ii=1,ifreq
+        do jj=1,ithet
+            write(80,*) freq_ww(ii)/tmp1,thet_ww(jj), phi_ww(ii,jj)*tmp2
+        enddo
+    enddo
+    close(80)
+
+    100 continue
+    !Normalization. Prepare for initiate_irreg_f
+    freq_ww = freq_ww/tmp1
+    phi_ww = phi_ww*tmp2
+END SUBROUTINE read_irreg_f
+
+
+SUBROUTINE initiate_irreg_f
+    !-------------------------------------------
+    ! Rewritten by Jie Yu, NRL, 2018-08-08
+    ! Initialisation of irregular multi-directional sea state (linear)
+    ! - From spectrum file from WAVEWATCH III
+    ! - Bivariate interpolation onto model grid points.
+    ! Note:
+    ! Make sure that the WW3 spectrum peaks are in the range [-pi/2, pi/2],
+    ! which is currently the HOS setup. The modification is done in read_irreg_f().
+    ! It can also be pre-processed using matlab.
+    !-------------------------------------------
+    IMPLICIT NONE
+    INTEGER :: iseed,i1,i2
+    REAL(RP) :: theta, E, pioxlen, pioylen
+    REAL(RP) :: angle, angle1, angle2
+    REAL(RP), DIMENSION(m1o2p1,m2,2) :: rnd
+    REAL(RP), DIMENSION(m1o2p1,m2) :: phi_E
+    INTEGER, DIMENSION(m1o2p1,m2) :: ind_o_ww,ind_t_ww
+    ! For interpolation
+    ! n = number of data points
+    ! nq= number of points to be used in least square fit.
+    ! 5 <nq< min(40, n-1). nq=13 is highly recommended.
+    ! nw= number of data points within (hence determining) the radii of influence R(k).
+    ! 1 <nw< min(40,n-1). nw=19 is recommended for large data set
+    ! nr: dividing the surface containing the data into nr x nr cells.
+    ! nr = sqrt(n/3) is recommended.
+    !* Move to variables_3d:
+    integer (kind=4), parameter :: nq = 13
+    integer (kind=4), parameter :: nw = 19
+    integer (kind=4), dimension(nr,nr) :: lcell
+    integer (kind=4), dimension(npt) :: lnext
+    real (kind=8), dimension(npt) :: rsq
+    real (kind=8), dimension(npt) :: xd,yd,zd
+    real (kind=8), dimension(5,npt) :: coeff
+    real (kind=8), dimension(n1o2p1,n2) :: thet_hos
+    integer (kind=4) :: ier
+    real (kind=8) :: px,py,q,dx,dy,xmin,ymin,rmax
+    real (kind=8) :: qx,qy !needed if qs2grd() is used
+    real (kind=8) :: phi_max,cutoff
+    integer (kind=4) :: temp(2)
+    pioxlen = TWOPI/xlen_star !dkx
+    pioylen = TWOPI/ylen_star !dky
+    do i1=1,ifreq
+        do i2=1,ithet
+            xd((i1-1)*ithet + i2) = freq_ww(i1)
+            yd((i1-1)*ithet + i2) = thet_ww(i2)
+            zd((i1-1)*ithet + i2) = phi_ww(i1,i2)
+        enddo
+    enddo
+    ! Rescale to make zd_max=1.0, to avoid small numbers in interpolation cal.
+    phi_max = maxval(phi_ww)
+    zd = zd/phi_max
+    cutoff = 0.05_rp
+    ! Call QSHEP2 to define the interpolant Q to this data.
+    call qshep2(npt,xd,yd,zd,nq,nw,nr,lcell,lnext,xmin,ymin,&
+                 dx,dy,rmax,rsq,coeff,ier)
+    if (ier /= 0) then
+        write (*,'(a,i8)') ' Error in qshep2, ier = ', ier
+        stop
+    end if
+    !Calculate theta used in HOS
+    thet_hos(1,1) = 0.0_rp
+    i2=1
+    do i1=2,n1o2p1
+        thet_hos(i1,i2) = atan2(ky_n2(i2),kx(i1))
+    enddo
+    i1=1
+    do i2=2,n2
+        thet_hos(i1,i2) = atan2(ky_n2(i2),kx(i1))
+    enddo
+    do i1=2,n1o2p1
+        do i2=2,n2
+            thet_hos(i1,i2) = atan2(ky_n2(i2),kx(i1))
+        enddo
+    enddo
+    phi_E = 0.0_rp
+    do i1=1,n1o2p1
+        do i2=1,n2
+            px=omega_n2(i1,i2)
+            if(px .ge. freq_ww(1) .and. px .le. freq_ww(ifreq)) then
+                py=thet_hos(i1,i2)
+                if (py .ge. thet_ww(1) .and. py .le. thet_ww(ithet)) then
+                    !Do the interpolation.
+                    q=qs2val(px,py,npt,xd,yd,zd,nr,lcell,lnext, &
+                             xmin,ymin,dx,dy,rmax,rsq,coeff)
+                    !If gradient at (px,py) is also needed use qs2grd
+                    if (q .lt. 0.0) then
+                        if (abs(q) .le. cutoff) then
+                            q = 0.0_rp
+                        else
+                            write(*,'(a,3e14.6)') 'At (px,qx), negative q : ', px,py,q
+                        endif
+                    endif
+                    phi_E(i1,i2) = q
+                else
+                    phi_E(i1,i2) = 0.0_rp !Outside the range of directions
+                endif
+            else
+                phi_E(i1,i2) = 0.0_rp !Outside the range of frequencies
+            endif
+        enddo
+    enddo
+    if (iseven(n2)) phi_E(:,n2o2p1) = 0.0_rp
+    phi_E = phi_E*phi_max !scale back
+    write(*,*) 'max phi_E =', maxval(phi_E)
+    write(*,*) 'n1o2p1, n2 = ', n1o2p1, n2
+    open(99,file='ww3_intpl.dat',status='unknown')
+    do i1=1,n1o2p1
+        do i2=1,n2
+            px=omega_n2(i1,i2)
+            py=thet_hos(i1,i2)
+            write(99,*) px,py,phi_E(i1,i2)
+        enddo
+    enddo
+    close(99)
+    ! Compute the random numbers used for phases
+    IF (random_phases.EQ.0) THEN
+        ! Same random numbers for each run, given (n1,n2)
+        CALL init_not_random_seed()
+        CALL RANDOM_NUMBER(rnd)
+    ELSEIF (random_phases.EQ.1) THEN
+        ! Different random numbers for each run
+        CALL init_random_seed()
+        CALL RANDOM_NUMBER(rnd)
+    ELSE
+        PRINT*, 'Random number generation undefined'
+        STOP
+    ENDIF
+    ! -Initialize the amplitudes of the Fourier modes for surface elevation \eta
+    ! and surface velocity potential.
+    ! a_eta = 2*(Cg/k)*S(omega, theta)*dkx*dky
+    ! a_phis= (-i*g/omega)*a_eta (linearized Beroulli eq at z=0, with p_atm=0)
+    ! -In the following implementation, deep-water waves are assumed.
+    ! -Under the normalization used by HOS-ocean,
+    ! 2*(Cg/k)=1/omega*^3, -i*g/omega = -i/omega*,
+    ! where omega* = omega/omega_p is the dimensionless frequency.
+    a_eta=0.0_cp !make sure a_eta(1,1)=0, a_phis(1,1)=0
+    a_phis=0.0_cp
+    E=0.0_rp
+    do i1 = 1, n1o2p1
+        do i2 = 1, n2
+            if (phi_E(i1,i2) .gt. tiny) then
+                !phi_E should be non-negative after the interpolation calculations.
+                !for small phi_E, a_eta = 0
+                if (i1 /= 1 .or. i2 /= 1) then
+                    angle1 = rnd(i1,i2,1)*TWOPI
+                    angle2 = rnd(i1,i2,2)*TWOPI
+                    angle = 0.0_rp
+                    a_eta(i1,i2)=(phi_E(i1,i2)*pioxlen*pioylen)**(0.5_rp) &
+                                 *(1.0_rp/omega_n2(i1,i2)**3)**(0.5_rp) &
+                                 *exp(i*(angle1+angle2+angle))
+                    a_phis(i1,i2)=(-1.0_rp*i/omega_n2(i1,i2))*a_eta(i1,i2)
+                    E=E + 0.5_rp*abs(a_eta(i1,i2))**2
+                endif
+            endif
+        enddo
+    enddo
+    E_tot = E * g_star ! g_star=1 for deep-water wave
+    write(*,*) 'In initiate irreg_f, g_star,L_out,T_out=',g_star,L_out,T_out !jyu
+    write(*,*) 'E =',E,'Hs_ini =',4*SQRT(E/g_star) * L_out, 'Tp_ini =',Tp_real
+END SUBROUTINE initiate_irreg_f
+
+
+
+
 END MODULE initial_condition

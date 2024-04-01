@@ -100,6 +100,9 @@ IF (i_restart.EQ.0) THEN ! Classical simulation without restart file
     CALL read_datum(unit, random_phases)   ! Random phases generation
     CALL read_blank_line(unit)
     WRITE(*,*)
+    CALL read_datum(unit,ww3shft) 
+    CALL read_blank_line(unit)
+    WRITE(*,*)
     CALL read_datum(unit, tecplot)         ! Tecplot version
     CALL read_datum(unit, i_out_dim)       ! Output: 1-dim. 0-non dim.
     CALL read_datum(unit, i_3d)            ! 3d free surface quantities
@@ -289,6 +292,9 @@ CALL write_datum(unit, Hs_real,         'Hs_real',      'Significant wave height
 CALL write_datum(unit, gamma,           'gamma',        'JONSWAP Spectrum')
 CALL write_datum(unit, beta,            'beta',         'Directionality (Dysthe)')
 CALL write_datum(unit, random_phases,   'random_phases','Random phases generation')
+!
+CALL write_blank_line(unit,'--- WW3 input spectrum (i_case=31)')
+CALL write_datum(unit, ww3shft,         'ww3shft',      'Peak period in s')
 !
 CALL write_blank_line(unit,'--- Output files')
 CALL write_datum(unit, tecplot,           'tecplot',        'Tecplot version')

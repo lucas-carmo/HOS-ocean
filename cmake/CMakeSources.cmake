@@ -8,6 +8,15 @@ SET(srcHOS_ocean
     ${SRC_DIRECTORY}/HOS/input_HOS.f90
     ${SRC_DIRECTORY}/HOS/output.f90
     ${SRC_DIRECTORY}/HOS/velocities.f90
+    ${SRC_DIRECTORY}/sheppack/src/blas_shep.f90
+    ${SRC_DIRECTORY}/sheppack/src/linear_shepard.f90
+    ${SRC_DIRECTORY}/sheppack/src/qshep2d.f90
+    ${SRC_DIRECTORY}/sheppack/src/qshep3d.f90
+    ${SRC_DIRECTORY}/sheppack/src/qshepmd.f90
+    ${SRC_DIRECTORY}/sheppack/src/real_precision.f90
+    ${SRC_DIRECTORY}/sheppack/src/cshep2d.f90
+    ${SRC_DIRECTORY}/sheppack/src/qshepmdata.f90
+    ${SRC_DIRECTORY}/sheppack/src/sheppack.f90    
     ${SRC_DIRECTORY}/utilities/nrutil_tmp.f90
     ${SRC_DIRECTORY}/utilities/filters.f90
     ${SRC_DIRECTORY}/utilities/type.f90
