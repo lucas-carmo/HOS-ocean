@@ -1,3 +1,7 @@
+# About this fork
+This fork implements the changes from “Implementation of Two New Spectral Input Options in HOS-Ocean – Part I” (available at https://apps.dtic.mil/sti/pdfs/AD1111149.pdf) regarding the use of WaveWatch III data.
+
+
 # HOS-ocean 
 
 High-Order Spectral method for oceanic simulations
