@@ -1,6 +1,19 @@
 # About this fork
 This fork implements the changes from “Implementation of Two New Spectral Input Options in HOS-Ocean – Part I” (available at https://apps.dtic.mil/sti/pdfs/AD1111149.pdf) regarding the use of WaveWatch III data.
 
+Also, some modifications to compile on Kestrel. I haven't tried to compile on Eagle, but you would probably need to change 
+SET(LAPACK_ROOT /nopt/nrel/apps/libraries/modules-11-23/netlib-lapack) on CMakeLists.txt to point to the correct path. 
+
+# Compiling on Kestrel
+Not sure if this is the best way of doing that
+```
+cd cmake
+mkdir build
+cd build
+module load gcc/13.1.0 && module load openblas/0.3.23-gcc && module load netlib-lapack/3.11.0-gcc && module load fftw/3.3.10-openmpi-gcc
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
+```
 
 # HOS-ocean 
 
